@@ -1,6 +1,7 @@
-# 艺术品投资回报预测模型：基于 Excel 假设和现金流构建的核心函数模型
+# art_investment_model.py
 import pandas as pd
 import numpy as np
+import numpy_financial as npf
 
 class ArtInvestmentModel:
     def __init__(self, assumptions_df, cashflow_df, scenario_df):
@@ -27,12 +28,20 @@ class ArtInvestmentModel:
         return price * volume
 
     def get_cashflow(self):
-        return self.cashflow[self.cashflow['项目'] == '净利润(元)'].iloc[0, 1:6].astype(float).values
+        try:
+            return self.cashflow[self.cashflow['项目'] == '净利润(元)'].iloc[0, 1:6].astype(float).fillna(0).values
+        except Exception as e:
+            print(f"获取现金流出错: {e}")
+            return [0, 0, 0, 0, 0]
 
     def calculate_irr(self, initial_investment):
         cashflows = [-initial_investment] + list(self.get_cashflow())
-        irr = np.irr(cashflows)
-        return irr
+        try:
+            irr = npf.irr(cashflows)
+            return irr if irr is not None else 0
+        except Exception as e:
+            print(f"IRR 计算出错: {e}")
+            return 0
 
     def calculate_payback_period(self, initial_investment):
         profits = self.get_cashflow()
@@ -48,3 +57,13 @@ class ArtInvestmentModel:
         matrix.index = self.scenario.iloc[1:, 0].astype(float)
         matrix.columns = self.scenario.columns[1:].astype(float)
         return matrix
+
+    def irr_vs_investment(self, investment_range):
+        result = []
+        for invest in investment_range:
+            try:
+                irr = npf.irr([-invest] + list(self.get_cashflow()))
+                result.append(irr * 100 if irr is not None else 0)
+            except:
+                result.append(0)
+        return pd.Series(result, index=investment_range)
